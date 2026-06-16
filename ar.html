@@ -10,19 +10,14 @@
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
 
     #loading-screen {
-      position: fixed;
-      inset: 0;
+      position: fixed; inset: 0;
       background: #0a0a0f;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      gap: 20px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 1000; gap: 20px;
       transition: opacity 0.5s;
     }
     #loading-screen.hidden { opacity: 0; pointer-events: none; }
-
     .spinner {
       width: 52px; height: 52px;
       border: 4px solid rgba(99,102,241,0.2);
@@ -31,53 +26,35 @@
       animation: spin 0.9s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    #loading-screen p { color: #94a3b8; font-family: system-ui, sans-serif; font-size: 15px; }
+    #loading-screen p { color: #94a3b8; font-family: system-ui, sans-serif; font-size: 15px; text-align: center; padding: 0 24px; }
 
     #back-btn {
-      position: fixed;
-      top: 16px; left: 16px;
-      background: rgba(0,0,0,0.55);
-      backdrop-filter: blur(10px);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 100px;
-      padding: 10px 18px;
-      font-size: 14px; font-weight: 600;
-      text-decoration: none;
-      z-index: 100;
+      position: fixed; top: 16px; left: 16px;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+      color: #fff; border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 100px; padding: 10px 18px;
+      font-size: 14px; font-weight: 600; text-decoration: none; z-index: 200;
+      font-family: system-ui, sans-serif;
     }
 
     #scan-hint {
-      position: fixed;
-      bottom: 40px; left: 50%;
+      position: fixed; bottom: 100px; left: 50%;
       transform: translateX(-50%);
-      background: rgba(0,0,0,0.55);
-      backdrop-filter: blur(10px);
-      color: #e2e8f0;
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 100px;
-      padding: 12px 24px;
-      font-size: 14px; font-weight: 500;
-      white-space: nowrap;
-      z-index: 100;
-      font-family: system-ui, sans-serif;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+      color: #e2e8f0; border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 100px; padding: 12px 24px;
+      font-size: 14px; font-weight: 500; white-space: nowrap;
+      z-index: 200; font-family: system-ui, sans-serif;
       transition: opacity 0.4s;
     }
     #scan-hint.hidden { opacity: 0; }
 
     #debug-log {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      max-height: 35vh;
-      overflow-y: auto;
-      background: rgba(0,0,0,0.85);
-      color: #86efac;
-      font-family: monospace;
-      font-size: 11px;
-      padding: 8px;
-      z-index: 9999;
-      pointer-events: none;
+      position: fixed; bottom: 0; left: 0; right: 0;
+      max-height: 30vh; overflow-y: auto;
+      background: rgba(0,0,0,0.85); color: #86efac;
+      font-family: monospace; font-size: 11px;
+      padding: 8px; z-index: 9999; pointer-events: none;
     }
     #debug-log div { padding: 1px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
   </style>
@@ -86,27 +63,26 @@
 
   <div id="loading-screen">
     <div class="spinner"></div>
-    <p id="loading-msg">Starting camera…</p>
+    <p id="loading-msg">Requesting camera…</p>
   </div>
 
   <a href="index.html" id="back-btn">← Back</a>
-  <div id="scan-hint" class="hidden">📷 Point at a target image</div>
+  <div id="scan-hint" class="hidden">📷 Point at your target image</div>
   <div id="debug-log"></div>
 
+  <!-- Bare minimum MindAR scene — no extra renderer flags -->
   <a-scene
     mindar-image="imageTargetSrc: targets.mind; uiLoading: no; uiScanning: no; uiError: no;"
-    color-space="sRGB"
-    renderer="colorManagement: true; physicallyCorrectLights: true"
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false"
+    embedded
   >
     <a-assets timeout="3000">
       <video id="vid0"
         src="assets/videos/inicio_optimizado.mp4"
         muted playsinline loop
-        webkit-playsinline
-        crossorigin="anonymous"
-        preload="auto">
+        webkit-playsinline="true"
+        crossorigin="anonymous">
       </video>
     </a-assets>
 
@@ -115,53 +91,62 @@
     <a-entity mindar-image-target="targetIndex: 0">
       <a-plane src="#vid0"
         width="1" height="0.5625"
-        position="0 0 0.001"
-        rotation="0 0 0">
+        position="0 0 0.001">
       </a-plane>
     </a-entity>
   </a-scene>
 
   <script>
-    var log = (function() {
-      var el = document.getElementById('debug-log');
-      var msg = document.getElementById('loading-msg');
-      return function(text) {
-        console.log('[AR]', text);
-        var div = document.createElement('div');
-        div.textContent = text;
-        el.appendChild(div);
-        el.scrollTop = el.scrollHeight;
-        if (msg) msg.textContent = text;
-      };
-    })();
+    var loadingEl = document.getElementById('loading-screen');
+    var loadingMsg = document.getElementById('loading-msg');
+    var hint = document.getElementById('scan-hint');
+    var debugLog = document.getElementById('debug-log');
+    var vid0 = document.getElementById('vid0');
+    var scene = document.querySelector('a-scene');
 
-    var scene   = document.querySelector('a-scene');
-    var loading = document.getElementById('loading-screen');
-    var hint    = document.getElementById('scan-hint');
-    var vid0    = document.getElementById('vid0');
+    function log(msg, color) {
+      console.log('[AR]', msg);
+      var div = document.createElement('div');
+      div.textContent = msg;
+      if (color) div.style.color = color;
+      debugLog.appendChild(div);
+      debugLog.scrollTop = debugLog.scrollHeight;
+      loadingMsg.textContent = msg;
+    }
 
-    log('Page ready');
+    // Step 1: test camera directly before A-Frame even starts
+    log('Testing camera access…');
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(function(stream) {
+        log('Camera OK — starting AR…', '#86efac');
+        // Stop the test stream; MindAR will open its own
+        stream.getTracks().forEach(function(t) { t.stop(); });
+      })
+      .catch(function(err) {
+        log('Camera DENIED: ' + err.name + ' — ' + err.message, '#f87171');
+        loadingMsg.style.color = '#f87171';
+      });
 
+    // A-Frame / MindAR events
     scene.addEventListener('loaded', function() {
-      log('Scene loaded!');
+      log('A-Frame scene loaded', '#86efac');
     });
 
     scene.addEventListener('arReady', function() {
-      log('Camera live — scan your target!');
-      loading.classList.add('hidden');
+      log('MindAR ready — scan your target!', '#86efac');
+      loadingEl.classList.add('hidden');
       hint.classList.remove('hidden');
     });
 
     scene.addEventListener('arError', function(e) {
-      log('AR Error: ' + JSON.stringify(e.detail));
-      document.getElementById('loading-msg').style.color = '#f87171';
+      log('MindAR error: ' + JSON.stringify(e.detail), '#f87171');
     });
 
-    // Target 0 events
+    // Target detection
     var target0 = document.querySelector('[mindar-image-target]');
     target0.addEventListener('targetFound', function() {
-      log('Target found! Playing video…');
-      vid0.play().catch(function(e) { log('Video play error: ' + e.message); });
+      log('Target detected! Playing video…', '#a78bfa');
+      vid0.play().catch(function(e) { log('Video error: ' + e.message, '#f87171'); });
       hint.classList.add('hidden');
     });
     target0.addEventListener('targetLost', function() {
@@ -170,17 +155,17 @@
       hint.classList.remove('hidden');
     });
 
-    // Fallback: hide loading after 15s and show whatever state we're in
+    // Safety fallback
     setTimeout(function() {
-      if (!loading.classList.contains('hidden')) {
-        log('Timeout — hiding loader anyway');
-        loading.classList.add('hidden');
+      if (!loadingEl.classList.contains('hidden')) {
+        log('15s timeout — check debug above', '#fbbf24');
+        loadingEl.classList.add('hidden');
         hint.classList.remove('hidden');
       }
     }, 15000);
 
-    window.addEventListener('error', function(e) { log('JS: ' + e.message); });
-    window.addEventListener('unhandledrejection', function(e) { log('Promise: ' + e.reason); });
+    window.addEventListener('error', function(e) { log('JS Error: ' + e.message, '#f87171'); });
+    window.addEventListener('unhandledrejection', function(e) { log('Unhandled: ' + e.reason, '#f87171'); });
   </script>
 
 </body>
