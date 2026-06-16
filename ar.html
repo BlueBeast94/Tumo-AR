@@ -4,29 +4,25 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Tumo AR</title>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
 
     #loading-screen {
-      position: fixed; inset: 0;
-      background: #0a0a0f;
+      position: fixed; inset: 0; background: #0a0a0f;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      z-index: 1000; gap: 20px;
-      transition: opacity 0.5s;
+      z-index: 1000; gap: 20px; transition: opacity 0.5s;
     }
     #loading-screen.hidden { opacity: 0; pointer-events: none; }
     .spinner {
       width: 52px; height: 52px;
       border: 4px solid rgba(99,102,241,0.2);
-      border-top-color: #6366f1;
-      border-radius: 50%;
+      border-top-color: #6366f1; border-radius: 50%;
       animation: spin 0.9s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #loading-screen p { color: #94a3b8; font-family: system-ui, sans-serif; font-size: 15px; text-align: center; padding: 0 24px; }
+    #loading-msg { color: #94a3b8; font-family: system-ui, sans-serif; font-size: 15px; text-align: center; padding: 0 24px; }
 
     #back-btn {
       position: fixed; top: 16px; left: 16px;
@@ -36,10 +32,8 @@
       font-size: 14px; font-weight: 600; text-decoration: none; z-index: 200;
       font-family: system-ui, sans-serif;
     }
-
     #scan-hint {
-      position: fixed; bottom: 100px; left: 50%;
-      transform: translateX(-50%);
+      position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
       background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
       color: #e2e8f0; border: 1px solid rgba(255,255,255,0.2);
       border-radius: 100px; padding: 12px 24px;
@@ -48,7 +42,6 @@
       transition: opacity 0.4s;
     }
     #scan-hint.hidden { opacity: 0; }
-
     #debug-log {
       position: fixed; bottom: 0; left: 0; right: 0;
       max-height: 30vh; overflow-y: auto;
@@ -63,109 +56,109 @@
 
   <div id="loading-screen">
     <div class="spinner"></div>
-    <p id="loading-msg">Requesting camera…</p>
+    <p id="loading-msg">Loading AR…</p>
   </div>
 
   <a href="index.html" id="back-btn">← Back</a>
   <div id="scan-hint" class="hidden">📷 Point at your target image</div>
   <div id="debug-log"></div>
 
-  <!-- Bare minimum MindAR scene — no extra renderer flags -->
-  <a-scene
-    mindar-image="imageTargetSrc: targets.mind; uiLoading: no; uiScanning: no; uiError: no;"
-    vr-mode-ui="enabled: false"
-    device-orientation-permission-ui="enabled: false"
-    embedded
-  >
-    <a-assets timeout="3000">
-      <video id="vid0"
-        src="assets/videos/inicio_optimizado.mp4"
-        muted playsinline loop
-        webkit-playsinline="true"
-        crossorigin="anonymous">
-      </video>
-    </a-assets>
+  <!-- Hidden video asset -->
+  <video id="vid0"
+    src="assets/videos/inicio_optimizado.mp4"
+    muted playsinline loop
+    webkit-playsinline="true"
+    crossorigin="anonymous"
+    style="display:none">
+  </video>
 
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-    <a-entity mindar-image-target="targetIndex: 0">
-      <a-plane src="#vid0"
-        width="1" height="0.5625"
-        position="0 0 0.001">
-      </a-plane>
-    </a-entity>
-  </a-scene>
+  <!-- Three.js + MindAR (no A-Frame) -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
 
   <script>
-    var loadingEl = document.getElementById('loading-screen');
+    var loadingEl  = document.getElementById('loading-screen');
     var loadingMsg = document.getElementById('loading-msg');
-    var hint = document.getElementById('scan-hint');
-    var debugLog = document.getElementById('debug-log');
-    var vid0 = document.getElementById('vid0');
-    var scene = document.querySelector('a-scene');
+    var hint       = document.getElementById('scan-hint');
+    var debugEl    = document.getElementById('debug-log');
+    var vid0       = document.getElementById('vid0');
 
     function log(msg, color) {
       console.log('[AR]', msg);
       var div = document.createElement('div');
       div.textContent = msg;
       if (color) div.style.color = color;
-      debugLog.appendChild(div);
-      debugLog.scrollTop = debugLog.scrollHeight;
+      debugEl.appendChild(div);
+      debugEl.scrollTop = debugEl.scrollHeight;
       loadingMsg.textContent = msg;
     }
 
-    // Step 1: test camera directly before A-Frame even starts
-    log('Testing camera access…');
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-      .then(function(stream) {
-        log('Camera OK — starting AR…', '#86efac');
-        // Stop the test stream; MindAR will open its own
-        stream.getTracks().forEach(function(t) { t.stop(); });
-      })
-      .catch(function(err) {
-        log('Camera DENIED: ' + err.name + ' — ' + err.message, '#f87171');
-        loadingMsg.style.color = '#f87171';
-      });
-
-    // A-Frame / MindAR events
-    scene.addEventListener('loaded', function() {
-      log('A-Frame scene loaded', '#86efac');
-    });
-
-    scene.addEventListener('arReady', function() {
-      log('MindAR ready — scan your target!', '#86efac');
+    function hideLoading() {
       loadingEl.classList.add('hidden');
       hint.classList.remove('hidden');
-    });
+    }
 
-    scene.addEventListener('arError', function(e) {
-      log('MindAR error: ' + JSON.stringify(e.detail), '#f87171');
-    });
+    window.addEventListener('error', function(e) { log('JS: ' + e.message, '#f87171'); });
+    window.addEventListener('unhandledrejection', function(e) { log('Promise: ' + e.reason, '#f87171'); });
 
-    // Target detection
-    var target0 = document.querySelector('[mindar-image-target]');
-    target0.addEventListener('targetFound', function() {
-      log('Target detected! Playing video…', '#a78bfa');
-      vid0.play().catch(function(e) { log('Video error: ' + e.message, '#f87171'); });
-      hint.classList.add('hidden');
-    });
-    target0.addEventListener('targetLost', function() {
-      log('Target lost');
-      vid0.pause();
-      hint.classList.remove('hidden');
-    });
+    async function startAR() {
+      try {
+        log('Initializing MindAR…');
 
-    // Safety fallback
-    setTimeout(function() {
-      if (!loadingEl.classList.contains('hidden')) {
-        log('15s timeout — check debug above', '#fbbf24');
-        loadingEl.classList.add('hidden');
-        hint.classList.remove('hidden');
+        var MindARThree = window.MINDAR.IMAGE.MindARThree;
+        log('MindARThree: ' + (MindARThree ? 'found' : 'NOT FOUND'), MindARThree ? '#86efac' : '#f87171');
+
+        var mindarThree = new MindARThree({
+          container: document.body,
+          imageTargetSrc: 'targets.mind',
+          uiLoading: 'no',
+          uiScanning: 'no',
+          uiError: 'no',
+        });
+
+        log('MindAR instance created');
+
+        var renderer = mindarThree.renderer;
+        var scene    = mindarThree.scene;
+        var camera   = mindarThree.camera;
+
+        // Build video plane for target 0
+        var texture  = new THREE.VideoTexture(vid0);
+        var geometry = new THREE.PlaneGeometry(1, 0.5625);
+        var material = new THREE.MeshBasicMaterial({ map: texture });
+        var plane    = new THREE.Mesh(geometry, material);
+
+        var anchor = mindarThree.addAnchor(0);
+        anchor.group.add(plane);
+
+        anchor.onTargetFound = function() {
+          log('Target found! Playing video…', '#a78bfa');
+          vid0.play().catch(function(e) { log('Video error: ' + e.message, '#f87171'); });
+          hint.classList.add('hidden');
+        };
+
+        anchor.onTargetLost = function() {
+          log('Target lost');
+          vid0.pause();
+          hint.classList.remove('hidden');
+        };
+
+        log('Starting camera…');
+        await mindarThree.start();
+
+        log('Camera live! Scan your target.', '#86efac');
+        hideLoading();
+
+        renderer.setAnimationLoop(function() {
+          renderer.render(scene, camera);
+        });
+
+      } catch(e) {
+        log('ERROR: ' + e.message, '#f87171');
       }
-    }, 15000);
+    }
 
-    window.addEventListener('error', function(e) { log('JS Error: ' + e.message, '#f87171'); });
-    window.addEventListener('unhandledrejection', function(e) { log('Unhandled: ' + e.reason, '#f87171'); });
+    startAR();
   </script>
 
 </body>
