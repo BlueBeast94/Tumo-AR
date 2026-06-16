@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Tumo AR</title>
+
+  <!-- MindAR + A-Frame -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+
+    /* ── Loading screen ── */
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      background: #0a0a0f;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      gap: 20px;
+      transition: opacity 0.4s;
+    }
+
+    #loading-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .spinner {
+      width: 52px;
+      height: 52px;
+      border: 4px solid rgba(99,102,241,0.2);
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #loading-screen p {
+      color: #94a3b8;
+      font-family: system-ui, sans-serif;
+      font-size: 15px;
+    }
+
+    #debug-log {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-height: 40vh;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.85);
+      color: #86efac;
+      font-family: monospace;
+      font-size: 11px;
+      padding: 8px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    #debug-log div { padding: 1px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+    /* ── HUD overlay (lives on top of A-Frame) ── */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 100;
+      font-family: system-ui, sans-serif;
+    }
+
+    /* Back button */
+    #back-btn {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 100px;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      pointer-events: all;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Scanning hint — shown when no target found */
+    #scan-hint {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: #e2e8f0;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 100px;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: opacity 0.4s;
+    }
+
+    #scan-hint.hidden { opacity: 0; }
+
+    /* Target found badge */
+    #found-badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(99,102,241,0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: #fff;
+      border-radius: 100px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      opacity: 0;
+      transition: opacity 0.3s;
+      max-width: 200px;
+      text-align: center;
+    }
+
+    #found-badge.visible { opacity: 1; }
+
+    /* Scanning corner brackets */
+    .corners {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(70vw, 280px);
+      height: min(70vw, 280px);
+    }
+
+    .corners::before,
+    .corners::after,
+    .corner-br,
+    .corner-bl {
+      content: '';
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-color: rgba(99,102,241,0.8);
+      border-style: solid;
+    }
+
+    .corners::before { top: 0; left: 0; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+    .corners::after  { top: 0; right: 0; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+    .corner-br { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+    .corner-bl { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+
+    .corners.detected {
+      animation: pulse-border 1s ease-out;
+    }
+
+    @keyframes pulse-border {
+      0%   { border-color: rgba(99,102,241,1); }
+      100% { border-color: rgba(99,102,241,0.6); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading screen -->
+  <div id="loading-screen">
+    <div class="spinner"></div>
+    <p id="loading-msg">Initializing camera…</p>
+  </div>
+
+  <!-- Debug log (visible on screen so you can diagnose on mobile) -->
+  <div id="debug-log"></div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <a href="index.html" id="back-btn">← Back</a>
+    <div id="found-badge">🎯 Target found!</div>
+
+    <div class="corners" id="corners">
+      <div class="corner-br"></div>
+      <div class="corner-bl"></div>
+    </div>
+
+    <div id="scan-hint">📷 Point at a target image</div>
+  </div>
+
+  <!-- A-Frame AR Scene — built dynamically from ar-config.js -->
+  <a-scene id="ar-scene"
+    mindar-image="imageTargetSrc: targets.mind; uiLoading: no; uiScanning: no; uiError: no;"
+    color-space="sRGB"
+    renderer="colorManagement: true; physicallyCorrectLights: true"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false"
+  >
+    <a-assets>
+      <!-- Assets are injected by ar-builder.js -->
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <!-- Target entities are injected by ar-builder.js -->
+
+  </a-scene>
+
+  <!-- Config + builder scripts -->
+  <script src="js/ar-config.js"></script>
+  <script src="js/ar-builder.js"></script>
+</body>
+</html>
